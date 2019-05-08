@@ -65,7 +65,7 @@ class Module(nn.Module):
         return score
 
     # Trains the DNN, default parameters suggested by paper.
-    def train_model(self, train_dir, batch_size=16, epochs=5, lr=0.0001, momentum=0.9, weight_decay=0.00005):
+    def train_model(self, train_dir, gt_file_path, batch_size=16, epochs=5, lr=0.0001, momentum=0.9, weight_decay=0.00005):
         # If a GPU is available transfer model to GPU
         if torch.cuda.is_available():
             self.cuda()
@@ -74,12 +74,12 @@ class Module(nn.Module):
         optimizer = optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)
 
         # Instantiate data handler and loader to efficiently create batches
-        data_handler = DataHandler(train_dir,"data/train.txt", mode='train')
+        data_handler = DataHandler(train_dir,gt_file_path, mode='train')
         num_workers = 1
 
         # Use the weighted sampler for training
         loader = DataLoader(data_handler, batch_size, True, num_workers=num_workers, pin_memory=True)
-        dev_data_handler = DataHandler(train_dir, "data/train.txt", mode='val')
+        dev_data_handler = DataHandler(train_dir, gt_file_path, mode='val')
         dev_loader = DataLoader(dev_data_handler, batch_size, True, num_workers=num_workers, pin_memory=True)
 
         # Store the loss history and create variables that will store the best loss
@@ -273,6 +273,8 @@ if __name__ == "__main__":
     parser.add_argument('--height', action='store', type=int, default=220, help='Height of the images.')
     parser.add_argument('--save_dir', action='store', type=str, default='saved_weights',
                         help='Directory in which weights will be saved')
+    parser.add_argument('--gt_file_path', action='store', type=str, default='data/train.txt',
+                        help='Directory in which weights will be saved')
     parser.add_argument('--weights_path', action='store', type=str, default='saved_weights/dev_weights_epoch_22.pt',
                         help='Path of the weights to be loaded during predict time.')
     parser.add_argument('--train_dir', action='store', type=str, default="data/frames_train",
@@ -291,7 +293,7 @@ if __name__ == "__main__":
 
     obj = Module(width=args.width, height=args.height, save_dir=args.save_dir)
     if args.mode == 'train':
-        obj.train_model(train_dir=args.train_dir, batch_size=args.batch_size, lr=args.lr, epochs=args.epochs)
+        obj.train_model(train_dir=args.train_dir, gt_file_path=args.gt_file_path, batch_size=args.batch_size, lr=args.lr, epochs=args.epochs)
     elif args.mode == 'predict':
         obj.load_model(args.weights_path)
         obj.attention(args.test_dir, args.output_dir)
