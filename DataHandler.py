@@ -98,14 +98,14 @@ class DataHandler(Dataset):
             try:
                 img1 = np.asarray(Image.open(self.file_names[self.indices[ind]]).convert('RGB'))
                 img2 = np.asarray(Image.open(self.file_names[self.indices[ind]+1]).convert('RGB'))
-                #img = dense_optical_flow(img1,img2)
-                img1 = Image.fromarray(img1,'RGB')
+                img = dense_optical_flow(img1,img2)
+                img = Image.fromarray(img,'RGB')
                 names = self.file_names[self.indices[ind]]
                 # Apply transformation to image
                 if self.transform is not None:
-                    img = self.transform(img1)
+                    img = self.transform(img)
                 # Label of image
-                label = self.gt_file[self.indices[ind]-1]
+                label = self.gt_file[self.indices[ind]]
             except Exception as e:
                 pass
             return img, label, names
