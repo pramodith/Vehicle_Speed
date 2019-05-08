@@ -146,7 +146,7 @@ class Module(nn.Module):
                         images = images.cuda()
                         labels = labels.cuda()
 
-                    score = self.forward(images)
+                    score = self.forward(images).squeeze(1)
                     output = loss(score, labels)
 
                     total_dev_loss += output.item()
