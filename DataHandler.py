@@ -33,7 +33,7 @@ class TestDataHandler(Dataset):
         return len(self.file_names)
 
     def __getitem__(self, ind):
-        if ind < len(self.file_names):
+        if ind < len(self.file_names)-1:
             img1 = np.asarray(Image.open(self.file_names[ind]).convert('RGB'))
             img2 = np.asarray(Image.open(self.file_names[ind+1]).convert('RGB'))
             img = dense_optical_flow(img1, img2)
@@ -94,22 +94,23 @@ class DataHandler(Dataset):
 
     def __getitem__(self, ind):
         # Open the image corresponding to the index
-        img1 = np.asarray(Image.open(self.file_names[self.indices[ind]]).convert('RGB'))
-        img2 = np.asarray(Image.open(self.file_names[self.indices[ind]+1]).convert('RGB'))
-        img = dense_optical_flow(img1,img2)
-        img = Image.fromarray(img,'RGB')
-        names = self.file_names[self.indices[ind]]
-        # Apply transformation to image
-        if self.transform is not None:
-            img = self.transform(img)
-        # Label of image
-        label = self.gt_file[self.indices[ind]-1]
+        if ind < len(self.file_names):
+            img1 = np.asarray(Image.open(self.file_names[self.indices[ind]]).convert('RGB'))
+            img2 = np.asarray(Image.open(self.file_names[self.indices[ind]+1]).convert('RGB'))
+            img = dense_optical_flow(img1,img2)
+            img = Image.fromarray(img,'RGB')
+            names = self.file_names[self.indices[ind]]
+            # Apply transformation to image
+            if self.transform is not None:
+                img = self.transform(img)
+            # Label of image
+            label = self.gt_file[self.indices[ind]-1]
 
-        return img, label, names
+            return img, label, names
 
 if __name__ == "__main__":
-    data_handler = DataHandler("data/frames_train","data/train.txt","train")
-    batch_size = 8
+    data_handler = DataHandler("Vehicle_Speed/data/frames_train","Vehicle_Speed/data/train.txt","train")
+    batch_size = 128
     num_workers = 1
     all_labels = []
     loader = DataLoader(data_handler, batch_size,shuffle=True,num_workers=num_workers, pin_memory=True)
