@@ -111,7 +111,7 @@ class Module(nn.Module):
                 optimizer.zero_grad()
 
                 # Compute loss, gradients and backprop
-                output = loss(score, labels)
+                output = loss(score.squeeze(1), labels)
                 output.backward()
                 optimizer.step()
 
