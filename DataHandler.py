@@ -108,13 +108,13 @@ class DataHandler(Dataset):
         if self.transform is not None:
             img = self.transform(img)
         # Label of image
-        label = self.gt_file[self.indices[ind]]
+        label = self.gt_file[self.indices[ind]-1]
 
         return img, label, names
 
 if __name__ == "__main__":
     data_handler = DataHandler("data/frames_train","data/train.txt","train")
-    batch_size = 128
+    batch_size = 8
     num_workers = 1
     all_labels = []
     loader = DataLoader(data_handler, batch_size,shuffle=True,num_workers=num_workers, pin_memory=True)
