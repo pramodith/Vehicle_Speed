@@ -11,45 +11,39 @@ from utils import dense_optical_flow
 
 class TestDataHandler(Dataset):
 
-    def __init__(self, root_dir, test_images_dir=None, test_mask_images_dir=None):
+    def __init__(self, root_dir):
         # Root directory that contains the dataset
         self.root_dir = root_dir
         self.dataset_mean = [0.0014861894323434117]
         self.dataset_std = [0.0020256241244931863]
-        # test set
-        test_images_path = os.path.join(self.root_dir,test_images_dir)
-        test_mask_images_path = os.path.join(self.root_dir,test_mask_images_dir)
-        file_names = sorted(os.listdir(test_images_path))
-        mask_names = sorted(os.listdir(test_mask_images_path))
-        self.test_file_names = [os.path.join(test_images_path,name) for name in file_names]
-        self.test_mask_file_names = [os.path.join(test_mask_images_path,name) for name in mask_names]
+        self.root_dir = root_dir
+        self.file_names = sorted(os.listdir(self.root_dir), key=lambda x: int(x[:-4]))
+        self.file_names = [os.path.join(self.root_dir, name) for name in self.file_names]
         self.transform = self.create_transformation()
 
     @staticmethod
     def create_transformation():
         transform = transforms.Compose([
-            transforms.ToTensor(),
+            transforms.Resize((66, 200)),
+            transforms.ToTensor()
         ])
         return transform
 
     def __len__(self):
-        return len(self.test_file_names)
+        return len(self.file_names)
 
     def __getitem__(self, ind):
-        # Open both the test images and the masks
-        img = Image.open(self.test_file_names[ind]).convert('RGB')
-        name = self.test_file_names[ind]
-        mask = Image.open(self.test_mask_file_names[ind])
-        # print(self.test_mask_file_names[ind])
-        # If all pixels are white in the mask the image does not have any liver cells
-        if np.mean(mask) == 255:
-            label = 0
-        else:
-            label = 1
-        if self.transform is not None:
-            img = self.transform(img)
-
-        return img,label,name
+        if ind < len(self.file_names):
+            img1 = np.asarray(Image.open(self.file_names[ind]).convert('RGB'))
+            img2 = np.asarray(Image.open(self.file_names[ind+1]).convert('RGB'))
+            img = dense_optical_flow(img1, img2)
+            img = Image.fromarray(img, 'RGB')
+            names = self.file_names[ind]
+            # Apply transformation to image
+            if self.transform is not None:
+                img = self.transform(img)
+            # Label of image
+            return img, names
 
 
 class DataHandler(Dataset):
@@ -57,6 +51,7 @@ class DataHandler(Dataset):
     This is the data handler for the train and validation test set.
     '''
     def __init__(self, root_dir, gt_file_path, mode='train'):
+
         # Root directory that contains the dataset
         self.root_dir = root_dir
         self.file_names = sorted(os.listdir(self.root_dir),key=lambda x: int(x[:-4]))
