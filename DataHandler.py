@@ -61,8 +61,8 @@ class DataHandler(Dataset):
         self.root_dir = root_dir
         self.file_names = sorted(os.listdir(self.root_dir),key=lambda x: int(x[:-4]))
         self.file_names = [os.path.join(self.root_dir,name) for name in self.file_names]
-        self.dev_file_indices = list(np.asarray(random.sample(range(0,len(self.file_names)),int(0.2*len(self.file_names))))//2)
-        self.train_file_indices = [i for i in range(len(self.file_names)//2)]
+        self.dev_file_indices = list(np.asarray(random.sample(range(0,len(self.file_names)),int(0.2*len(self.file_names)))))
+        self.train_file_indices = [i for i in range(len(self.file_names))]
         self.train_file_indices = list(set(self.train_file_indices).difference(set(self.dev_file_indices)))
         self.dev_file_names = [os.path.join(self.root_dir,str(self.dev_file_indices[i])+".jpg") for i in range(len(self.dev_file_indices))]
         self.train_file_names = [os.path.join(self.root_dir, str(self.train_file_indices[i]) + ".jpg") for i in range(len(self.train_file_indices))]
@@ -99,22 +99,22 @@ class DataHandler(Dataset):
 
     def __getitem__(self, ind):
         # Open the image corresponding to the index
-        img1 = np.asarray(Image.open(self.file_names[self.indices[ind]*2]).convert('RGB'))
-        img2 = np.asarray(Image.open(self.file_names[self.indices[ind]*2+1]).convert('RGB'))
+        img1 = np.asarray(Image.open(self.file_names[self.indices[ind]]).convert('RGB'))
+        img2 = np.asarray(Image.open(self.file_names[self.indices[ind]+1]).convert('RGB'))
         img = dense_optical_flow(img1,img2)
         img = Image.fromarray(img,'RGB')
-        names = self.file_names[self.indices[ind]*2]
+        names = self.file_names[self.indices[ind]]
         # Apply transformation to image
         if self.transform is not None:
             img = self.transform(img)
         # Label of image
-        label = self.gt_file[self.indices[ind]*2]
+        label = self.gt_file[self.indices[ind]]
 
         return img, label, names
 
 if __name__ == "__main__":
     data_handler = DataHandler("data/frames_train","data/train.txt","train")
-    batch_size = 8
+    batch_size = 128
     num_workers = 1
     all_labels = []
     loader = DataLoader(data_handler, batch_size,shuffle=True,num_workers=num_workers, pin_memory=True)
