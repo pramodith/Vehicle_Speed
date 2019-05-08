@@ -139,6 +139,7 @@ class Module(nn.Module):
             # Ensure that gradients aren't computed since we don't need to back prop every other step is the same
             # as mentioned above
             with torch.no_grad():
+                index = 0
                 for i, batch in enumerate(dev_loader):
                     images = batch[0]
                     labels = batch[1].float()
@@ -151,114 +152,38 @@ class Module(nn.Module):
 
                     total_dev_loss += output.item()
                     del output
-            print("Validation loss is " + str(total_dev_loss))
+                    index = i
+            print("Validation loss is " + str(total_dev_loss/index))
 
             # Store the model corresponding to the best f1 score
-            if total_dev_loss > best_dev_loss:
+            if total_dev_loss < best_dev_loss:
                 best_dev_loss = total_dev_loss
                 torch.save(self.state_dict(), os.path.join(self.save_dir, "dev_weights_epoch_" + str(epoch) + ".pt"))
 
     # Predict the output label for the test set
     def predict(self, test_dir, batch_size):
-        data_handler = TestDataHandler(test_dir, "images_pngs", "masks_pngs")
+        data_handler = TestDataHandler(test_dir)
         num_workers = 1
-        loader = DataLoader(data_handler, batch_size, True, num_workers=num_workers, pin_memory=True)
-        self.cuda()
+        loader = DataLoader(data_handler, batch_size, False, num_workers=num_workers, pin_memory=True)
+        if torch.cuda.is_available():
+            self.cuda()
         self.eval()
         predicted_labels = []
         ground_truth = []
         with torch.no_grad():
             for batch in loader:
                 images = batch[0]
-                labels = batch[1]
+                names = batch[1]
+                print(names)
                 if torch.cuda.is_available():
                     images = images.cuda()
-                probs = F.softmax(self.forward(images))
-                predicted_labels.extend(list(torch.argmax(probs, 1).cpu().detach().numpy()))
-                ground_truth.extend(list(labels.detach().numpy()))
+                speed = self.forward(images).squeeze(1)
+                predicted_labels.extend(list(speed.cpu().detach().numpy()))
+        with open("test.txt","w+") as f:
+            for pred in predicted_labels:
+                f.write(str(pred)+"\n")
 
-        print("F1-score is " + str(f1_score(ground_truth, predicted_labels)))
-        print("Accuracy is " + str(accuracy_score(ground_truth, predicted_labels)))
 
-    # Generate the activation heat maps. Ideally the liver in an image should have high attention scores, test_dir
-    # is the folder that contains all the test images
-    def attention(self, test_dir, output_dir):
-        global interm_out
-        data_handler = TestDataHandler(test_dir, "images_pngs", "masks_pngs")
-        num_workers = 1
-        batch_size = 1
-        loader = DataLoader(data_handler, batch_size, True, num_workers=num_workers, pin_memory=True)
-        self.cuda()
-        self.eval()
-        with torch.no_grad():
-            for ind, batch in enumerate(loader):
-                images = batch[0]
-                labels = batch[1]
-                name = batch[2]
-                print("Image : " + str(ind))
-                if torch.cuda.is_available():
-                    images = images.cuda()
-
-                # Check the predicted class, 1 indicates presence of a liver 0 indicates the absence of a liver
-                pred = torch.argmax(F.softmax(self.forward(images)), 1)
-                # Default activation map is an empty 256*256 image
-                activation_map = np.zeros((self.width, self.height))
-
-                # If the network predicts the presence of a liver generate the activation maps
-                if pred[0].item() == 1:
-                    # Extract the weights of the Fully Connected layer of the ResNET corresponding to the predicted class
-                    weights = self.model.fc.weight[pred].cpu().detach().numpy().squeeze(0)
-                    # Extract the feature map of the last convolutional layer
-                    intermed_layer = interm_out[-1].cpu().detach().numpy()
-                    interm_out = []
-                    # Reshape such that the number of channels is the third dimension
-                    intermed_layer = intermed_layer.transpose([0, 2, 3, 1]).squeeze(0)
-                    print(intermed_layer.shape)
-                    # Resize the feature map to match the size of the input image
-                    mat_for_mul = zoom(intermed_layer, (
-                    self.width // intermed_layer.shape[0], self.height // intermed_layer.shape[1], 1), order=1)
-                    print(mat_for_mul.shape)
-                    # Find the activation scores
-                    activation_map = np.dot(mat_for_mul.reshape((self.width * self.height, 2048)), weights).reshape(
-                        self.width, self.height)
-
-                    # A score of 0.5 or greater is treated as the presence of a liver cell.
-                    activation_map[activation_map < 0.5] = 0
-                    activation_map[activation_map >= 0.5] = 255
-
-                # print("Saving :" + str(os.path.join(output_dir, name[0].split("/")[-1])))
-                if not os.path.isdir(output_dir):
-                    os.mkdir(output_dir)
-                cv2.imwrite(os.path.join(output_dir, name[0].split("/")[-1]), activation_map)
-
-    # This function calculates the pixel wise F1 scores for images that contain the liver
-    @staticmethod
-    def compute_pixel_wise_f1(ground_truth_masks_path, predicted_masks_path):
-        # Obtain the names of the predicted and groundtruth files and store their entire paths
-        ground_truth_masks_files = sorted(os.listdir(ground_truth_masks_path))
-        predicted_masks_files = sorted(os.listdir(predicted_masks_path))
-        ground_truth_masks_files = [os.path.join(ground_truth_masks_path, x) for x in ground_truth_masks_files]
-        predicted_masks_files = [os.path.join(predicted_masks_path, x) for x in predicted_masks_files]
-
-        # Running F1-score array
-        f1_scores = []
-        # Since files have the same names a sorted set of arrays will have a 1 to 1 correspondence in the ground truth
-        # masks files and predicted masks files
-        for gt_file, pred_file in zip(ground_truth_masks_files, predicted_masks_files):
-
-            # Read the masks as grayscale images
-            pred_mask = cv2.imread(pred_file, 0)
-            gt_mask = cv2.imread(gt_file, 0)
-            # In groundtruth images background is 255 changing it to 0 to match activation maps
-            gt_mask[gt_mask == 255] = 0
-            # If a pixel has score greater than 0 marking that as a positive classed pixel
-            gt_mask[gt_mask > 0] = 1
-            # Same for prediction mask
-            pred_mask[pred_mask > 0] = 1
-            # Computing the F1 score only for images that contain the liver.
-            if 0 < np.mean(gt_mask) < 255:
-                f1_scores.append(f1_score(gt_mask.reshape(-1), pred_mask.reshape(-1)))
-        print("Average F1 score is :" + str(np.mean(f1_scores)))
 
 
 if __name__ == "__main__":
@@ -275,11 +200,11 @@ if __name__ == "__main__":
                         help='Directory in which weights will be saved')
     parser.add_argument('--gt_file_path', action='store', type=str, default='data/train.txt',
                         help='Directory in which weights will be saved')
-    parser.add_argument('--weights_path', action='store', type=str, default='saved_weights/dev_weights_epoch_22.pt',
+    parser.add_argument('--weights_path', action='store', type=str, default='saved_weights/weights_epoch_6.pt',
                         help='Path of the weights to be loaded during predict time.')
     parser.add_argument('--train_dir', action='store', type=str, default="data/frames_train",
                         help='Directory containing the training images')
-    parser.add_argument('--test_dir', action='store', type=str, default="../test256",
+    parser.add_argument('--test_dir', action='store', type=str, default="data/frames_test",
                         help='Directroy containing the test images')
     parser.add_argument('--ground_truth_masks_dir', action='store', type=str, default='../test256/masks_pngs',
                         help='Directory containing the ground truth masks.')
@@ -296,5 +221,4 @@ if __name__ == "__main__":
         obj.train_model(train_dir=args.train_dir, gt_file_path=args.gt_file_path, batch_size=args.batch_size, lr=args.lr, epochs=args.epochs)
     elif args.mode == 'predict':
         obj.load_model(args.weights_path)
-        obj.attention(args.test_dir, args.output_dir)
-        obj.compute_pixel_wise_f1(args.ground_truth_masks_dir, args.output_dir)
+        obj.predict(args.test_dir,args.batch_size)

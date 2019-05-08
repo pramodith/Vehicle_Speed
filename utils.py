@@ -48,9 +48,9 @@ def dense_optical_flow(prev_frame,next_frame):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--save_path', action='store', type=str, default="data/frames_train",
+    parser.add_argument('--save_path', action='store', type=str, default="data/frames_test",
                         help='Directory containing the training images')
-    parser.add_argument('--video_path', action='store', type=str, default="../test256",
+    parser.add_argument('--video_path', action='store', type=str, default="data/test.mp4",
                         help='Directroy containing the test images')
 
     args = parser.parse_args()
