@@ -95,21 +95,23 @@ class DataHandler(Dataset):
     def __getitem__(self, ind):
         # Open the image corresponding to the index
         if ind < len(self.file_names):
-            img1 = np.asarray(Image.open(self.file_names[self.indices[ind]]).convert('RGB'))
-            img2 = np.asarray(Image.open(self.file_names[self.indices[ind]+1]).convert('RGB'))
-            img = dense_optical_flow(img1,img2)
-            img = Image.fromarray(img,'RGB')
-            names = self.file_names[self.indices[ind]]
-            # Apply transformation to image
-            if self.transform is not None:
-                img = self.transform(img)
-            # Label of image
-            label = self.gt_file[self.indices[ind]-1]
-
+            try:
+                img1 = np.asarray(Image.open(self.file_names[self.indices[ind]]).convert('RGB'))
+                img2 = np.asarray(Image.open(self.file_names[self.indices[ind]+1]).convert('RGB'))
+                #img = dense_optical_flow(img1,img2)
+                img1 = Image.fromarray(img1,'RGB')
+                names = self.file_names[self.indices[ind]]
+                # Apply transformation to image
+                if self.transform is not None:
+                    img = self.transform(img1)
+                # Label of image
+                label = self.gt_file[self.indices[ind]-1]
+            except Exception as e:
+                pass
             return img, label, names
 
 if __name__ == "__main__":
-    data_handler = DataHandler("Vehicle_Speed/data/frames_train","Vehicle_Speed/data/train.txt","train")
+    data_handler = DataHandler("data/frames_train","data/train.txt","train")
     batch_size = 128
     num_workers = 1
     all_labels = []
