@@ -171,14 +171,17 @@ class Module(nn.Module):
         predicted_labels = []
         ground_truth = []
         with torch.no_grad():
-            for batch in loader:
-                images = batch[0]
-                names = batch[1]
-                print(names)
-                if torch.cuda.is_available():
-                    images = images.cuda()
-                speed = self.forward(images).squeeze(1)
-                predicted_labels.extend(list(speed.cpu().detach().numpy()))
+            try:
+                for batch in loader:
+                    images = batch[0]
+                    names = batch[1]
+                    if torch.cuda.is_available():
+                        images = images.cuda()
+                    speed = self.forward(images).squeeze(1)
+                    predicted_labels.extend(list(speed.cpu().detach().numpy()))
+            except Exception as e:
+                print(e)
+                pass
         with open("test.txt","w+") as f:
             for pred in predicted_labels:
                 f.write(str(pred)+"\n")
@@ -190,7 +193,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--lr', action="store", default=0.0001, type=float,
                         help='The learning rate of the network')
-    parser.add_argument('--batch_size', action='store', type=int, default=8,
+    parser.add_argument('--batch_size', action='store', type=int, default=32,
                         help="The batch size for training.")
     parser.add_argument('--epochs', action='store', type=int, default=50, help="The number of epochs during train time")
     parser.add_argument('--momentum', action='store', type=float, default=0.9, help="The momentum for an optimizer")
@@ -200,7 +203,7 @@ if __name__ == "__main__":
                         help='Directory in which weights will be saved')
     parser.add_argument('--gt_file_path', action='store', type=str, default='data/train.txt',
                         help='Directory in which weights will be saved')
-    parser.add_argument('--weights_path', action='store', type=str, default='saved_weights/weights_epoch_6.pt',
+    parser.add_argument('--weights_path', action='store', type=str, default='saved_weights/dev_weights_epoch_4.pt',
                         help='Path of the weights to be loaded during predict time.')
     parser.add_argument('--train_dir', action='store', type=str, default="data/frames_train",
                         help='Directory containing the training images')
@@ -210,7 +213,7 @@ if __name__ == "__main__":
                         help='Directory containing the ground truth masks.')
     parser.add_argument('--output_dir', action='store', type=str, default="../results",
                         help='Directory that the output activation maps would be saved to')
-    parser.add_argument('--mode', action='store', choices=['train', 'predict'], default='train',
+    parser.add_argument('--mode', action='store', choices=['train', 'predict'], default='predict',
                         help='In train mode the network will be trained, in predict mode the network will use'
                              'the default weights to predict the pixel wise classes', required=False)
 
